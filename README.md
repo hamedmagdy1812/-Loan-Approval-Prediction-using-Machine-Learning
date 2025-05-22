@@ -19,6 +19,16 @@ This project demonstrates how to use machine learning to predict loan approval d
 - **Comprehensive visualizations**: Target distribution, feature correlations, boxplots, and more
 - **Robust error handling**: Handles missing values, file loading issues, and optional dependencies
 - **Performance comparisons**: Both visual and CSV exports of model performance metrics
+- **Tabular results**: Clean, formatted tables with dividing lines for easy comparison
+
+## Current Datasets
+
+The project currently uses four real-world datasets:
+
+1. **Original Loan Dataset** - Contains loan application data and approval status
+2. **Financial Balance Sheet** - Financial records with credit decisioning information
+3. **German Credit Risk** - The standard German credit dataset with risk classification
+4. **Credit Risk Dataset** - Additional loan approval data with default status
 
 ## Requirements
 
@@ -53,9 +63,10 @@ brew install libomp
 2. Update the dataset file paths in the `dataset_paths` dictionary at the bottom of the script:
    ```python
    dataset_paths = {
-       "Credit Score Dataset": "/path/to/your/credit_data.csv",
-       "Loan Approval Dataset": "/path/to/your/loan_data.xlsx",
-       "Financial History Dataset": "/path/to/your/financial_data.pkl"
+       "Original Loan Dataset": "/path/to/your/loan_approval_data.csv",
+       "Financial Balance Sheet": "/path/to/your/balance_sheet.xlsx",
+       "German Credit Risk": "/path/to/your/german_credit_data.csv",
+       "Credit Risk Dataset": "/path/to/your/loan_approval_dataset_2.csv"
    }
    ```
 3. Run the script:
@@ -111,6 +122,22 @@ The project includes 11 machine learning models:
 9. XGBoost (if available)
 10. AdaBoost
 11. Neural Network (MLP)
+
+## Model Comparison
+
+The script generates a neatly formatted table comparing model performance across all datasets:
+
+```
+---------------------------------------------------------------------------------------------------
+| Model                     | Original Loan Dataset | Financial Balance Sheet | Credit Risk Dataset | Average |
+---------------------------------------------------------------------------------------------------
+| XGBoost                   |               97.89% |                 100.0% |              97.89% |  98.59% |
+---------------------------------------------------------------------------------------------------
+| Gradient Boosting         |               97.54% |                 100.0% |              97.66% |   98.4% |
+---------------------------------------------------------------------------------------------------
+```
+
+This allows for easy identification of the best performing models for your loan approval prediction tasks.
 
 ## Educational Focus
 

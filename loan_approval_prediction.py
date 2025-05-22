@@ -532,7 +532,36 @@ def compare_models(all_results):
     for col in comparison.columns:
         comparison_display[col] = comparison_display[col].astype(str) + '%'
     
-    print(comparison_display)
+    # Display the table with dividing lines
+    pd.set_option('display.max_columns', None)  # Show all columns
+    pd.set_option('display.width', 120)  # Set display width
+    
+    # Calculate column widths
+    model_width = 25
+    col_widths = {col: max(len(col) + 2, 12) for col in comparison_display.columns}
+    
+    # Calculate total table width
+    total_width = model_width + sum(col_widths.values()) + len(comparison_display.columns) + 3
+    
+    # Format table with dividing lines
+    print("\n" + "-" * total_width)  # Top border
+    
+    # Header row
+    header = f"| {'Model'.ljust(model_width)} |"
+    for col in comparison_display.columns:
+        header += f" {col.center(col_widths[col])} |"
+    print(header)
+    print("-" * total_width)  # Header separator line
+    
+    # Print each row with borders
+    for model, row in comparison_display.iterrows():
+        model_name = model[:model_width].ljust(model_width)  # Limit and pad model name
+        line = f"| {model_name} |"
+        for i, (col, value) in enumerate(row.items()):
+            line += f" {value.rjust(col_widths[col])} |"
+        print(line)
+        print("-" * total_width)  # Row separator line
+    
     print("\n📌 Best Overall Model: " + comparison.index[0])
     
     # Get timestamp for unique filenames
@@ -578,8 +607,10 @@ if __name__ == "__main__":
     
     # Define paths to your local datasets - update these with your actual file paths
     dataset_paths = {
-        "Loan Approval Dataset": "/Users/Hamed/Documents/selected topics/-Loan-Approval-Prediction-using-Machine-Learning/Datasets/loan_approval_data.csv",
-        "Financial History Dataset": "/Users/Hamed/Documents/selected topics/-Loan-Approval-Prediction-using-Machine-Learning/Datasets/Balance Sheet .xlsx"
+        "Original Loan Dataset": "/Users/Hamed/Documents/selected topics/-Loan-Approval-Prediction-using-Machine-Learning-1/Datasets/loan_approval_data.csv",
+        "Financial Balance Sheet": "/Users/Hamed/Documents/selected topics/-Loan-Approval-Prediction-using-Machine-Learning-1/Datasets/Balance Sheet .xlsx",
+        "German Credit Risk": "/Users/Hamed/Documents/selected topics/-Loan-Approval-Prediction-using-Machine-Learning-1/Datasets/german_credit_data.csv",
+        "Loan Approval Dataset 2": "/Users/Hamed/Documents/selected topics/-Loan-Approval-Prediction-using-Machine-Learning-1/Datasets/loan_approval_dataset_2.csv"
     }
     
     # Process each dataset and collect results
