@@ -22,11 +22,16 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
-from xgboost import XGBClassifier
 import random
 import warnings
 warnings.filterwarnings('ignore')
 
+# Try to import XGBoost, but don't fail if it's not available
+try:
+    from xgboost import XGBClassifier
+    has_xgboost = True
+except ImportError:
+    print("⚠️ XGBoost is not available. The XGBoost model will be skipped.")
 # Setting up visualization style
 plt.style.use('ggplot')
 sns.set(style="whitegrid")
@@ -199,18 +204,53 @@ def visualize_data(df, dataset_name):
     
     # 3. Correlation heatmap
     plt.figure(figsize=(12, 10))
+    # Filter for only numeric columns and drop any constant columns
     numerical_df = df.select_dtypes(include=['int64', 'float64'])
     if not numerical_df.empty:
-        correlation = numerical_df.corr()
-        mask = np.triu(correlation)
-        sns.heatmap(correlation, annot=True, mask=mask, cmap="coolwarm", linewidths=0.5, fmt=".2f")
-        plt.title(f"{dataset_name} - Correlation Heatmap")
+        # Drop columns with all the same value (no variance)
+        numerical_df = numerical_df.loc[:, numerical_df.nunique() > 1]
         
-        filename = os.path.join(viz_folder, f"{dataset_name}_correlation_heatmap.png")
-        plt.tight_layout()
-        plt.savefig(filename, dpi=150)
-        plt.close()
-        print(f"✅ Correlation heatmap saved to '{filename}'")
+        # Check if we still have numeric columns after filtering
+        if not numerical_df.empty and numerical_df.shape[1] > 1:
+            # Fill any NaN values to avoid correlation errors
+            numerical_df = numerical_df.fillna(numerical_df.mean())
+            
+            # Calculate correlation matrix
+            correlation = numerical_df.corr()
+            
+            # If the correlation matrix is too large, only show top correlated features
+            if correlation.shape[0] > 20:
+                print(f"⚠️ Correlation matrix is large ({correlation.shape[0]}x{correlation.shape[0]}). Showing only top correlations.")
+                # Get the mean absolute correlation for each feature
+                mean_abs_corr = correlation.abs().mean()
+                # Select top 15 features
+                top_features = mean_abs_corr.nlargest(15).index
+                correlation = correlation.loc[top_features, top_features]
+                
+            # Create mask for upper triangle
+            mask = np.triu(correlation)
+            
+            # Create heatmap with improved settings
+            sns.heatmap(
+                correlation, 
+                annot=True, 
+                mask=mask, 
+                cmap="coolwarm", 
+                linewidths=0.5, 
+                fmt=".2f",
+                annot_kws={"size": 8 if correlation.shape[0] > 10 else 10}
+            )
+            plt.title(f"{dataset_name} - Correlation Heatmap")
+            
+            filename = os.path.join(viz_folder, f"{dataset_name}_correlation_heatmap.png")
+            plt.tight_layout()
+            plt.savefig(filename, dpi=150)
+            plt.close()
+            print(f"✅ Correlation heatmap saved to '{filename}'")
+        else:
+            print(f"⚠️ Not enough numeric features with variance to create a correlation heatmap")
+    else:
+        print(f"⚠️ No numeric features found to create a correlation heatmap")
     
     # 4. Box plots for numerical features
     plt.figure(figsize=(12, 8))
@@ -327,10 +367,13 @@ def train_and_evaluate_models(X_train, X_test, y_train, y_test, preprocessor, da
         "Naive Bayes": GaussianNB(),
         "Gradient Boosting": GradientBoostingClassifier(),
         "Genetic Algorithm": GeneticAlgorithmClassifier(generations=20),
-        "XGBoost": XGBClassifier(use_label_encoder=False, eval_metric='logloss'),
         "AdaBoost": AdaBoostClassifier(),
         "Neural Network": MLPClassifier(max_iter=1000, hidden_layer_sizes=(100,50), early_stopping=True)
     }
+    
+    # Add XGBoost if available
+    if 'has_xgboost' in globals() and has_xgboost:
+        models["XGBoost"] = XGBClassifier(use_label_encoder=False, eval_metric='logloss')
     
     # Train and evaluate each model
     results = {}

@@ -9,8 +9,16 @@ This project demonstrates how to use machine learning to predict loan approval d
 - Data loading and exploration
 - Data visualization
 - Preprocessing (handling missing values, encoding categorical features)
-- Training and evaluating 8 different machine learning models
+- Training and evaluating 11 different machine learning models
 - Performance comparison across multiple datasets
+
+## Features
+
+- **Multi-format support**: Handles CSV, Excel (.xlsx, .xls), and Pickle (.pkl) files
+- **Organized visualization folders**: Each dataset gets its own folder with descriptive filenames
+- **Comprehensive visualizations**: Target distribution, feature correlations, boxplots, and more
+- **Robust error handling**: Handles missing values, file loading issues, and optional dependencies
+- **Performance comparisons**: Both visual and CSV exports of model performance metrics
 
 ## Requirements
 
@@ -22,10 +30,21 @@ To run this project, you need Python 3.6+ with the following libraries:
 - scikit-learn
 - openpyxl (for Excel files)
 - xlrd (for older Excel files)
+- xgboost (optional, for XGBoost model)
 
 Install the required packages using:
 ```
 pip install pandas numpy matplotlib seaborn scikit-learn openpyxl xlrd
+```
+
+For XGBoost support:
+```
+pip install xgboost
+```
+
+Note for macOS users: If you encounter XGBoost errors, install OpenMP:
+```
+brew install libomp
 ```
 
 ## How to Use
@@ -46,7 +65,7 @@ pip install pandas numpy matplotlib seaborn scikit-learn openpyxl xlrd
 
 ## Supported File Formats
 
-The script can now handle multiple file formats:
+The script can handle multiple file formats:
 - CSV files (.csv)
 - Excel files (.xlsx, .xls)
 - Pickle files (.pkl)
@@ -58,24 +77,28 @@ For each dataset:
 - The target variable (loan approval status) should be in the last column
 - Should contain relevant features for loan/credit approval prediction
 
-## Output
+## Output Structure
 
-The script will:
-1. Display information about each dataset
-2. Create visualizations saved as PNG files
-3. Train and evaluate 8 machine learning models on each dataset
-4. Generate a performance comparison chart across all datasets
-5. Save the comparison as 'model_comparison.png'
-
-## Error Handling
-
-The script now includes improved error handling:
-- Catches and reports file loading errors
-- Provides warnings for datasets with fewer than 1500 records
-- Gracefully handles visualization errors
-- Reports preprocessing and model training errors
+The script organizes outputs in a clear folder structure:
+```
+├── Dataset_Name_visualizations/
+│   ├── target_distribution.png
+│   ├── categorical_feature_distribution.png
+│   ├── correlation_heatmap.png
+│   ├── boxplots.png
+│   ├── pairplot.png
+│   └── model_results/
+│       ├── accuracy_comparison.png
+│       └── model_confusion_matrix.png
+└── comparison_results/
+    ├── model_comparison.csv
+    ├── performance_heatmap.png
+    └── all_models_comparison.png
+```
 
 ## Models Used
+
+The project includes 11 machine learning models:
 
 1. Logistic Regression
 2. Support Vector Machine (SVM)
@@ -85,6 +108,9 @@ The script now includes improved error handling:
 6. Naive Bayes
 7. Gradient Boosting
 8. Genetic Algorithm (custom implementation)
+9. XGBoost (if available)
+10. AdaBoost
+11. Neural Network (MLP)
 
 ## Educational Focus
 
@@ -93,3 +119,4 @@ This project is designed to be educational and beginner-friendly with:
 - Friendly output messages
 - Visualizations to help understand the data
 - Performance metrics to compare different algorithms
+- Error handling with helpful messages
