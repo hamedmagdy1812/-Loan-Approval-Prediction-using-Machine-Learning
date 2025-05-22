@@ -147,7 +147,9 @@ def visualize_data(df, dataset_name):
         sns.histplot(df[target_col], kde=True)
         plt.title(f"Distribution of {target_col}")
     
-    filename = os.path.join(viz_folder, "target_distribution.png")
+    # Create a safe filename from the target column name
+    safe_target_name = target_col.replace(" ", "_").replace("/", "_").replace("\\", "_")
+    filename = os.path.join(viz_folder, f"{safe_target_name}_distribution.png")
     plt.tight_layout()
     plt.savefig(filename, dpi=150)
     plt.close()
@@ -188,7 +190,7 @@ def visualize_data(df, dataset_name):
             # Format the plot to avoid overlap
             ax.tick_params(axis='y', labelsize=9)
             
-            safe_col_name = cat_col.replace(" ", "_").replace("/", "_")
+            safe_col_name = cat_col.replace(" ", "_").replace("/", "_").replace("\\", "_").replace("(", "").replace(")", "")
             filename = os.path.join(viz_folder, f"{safe_col_name}_distribution.png")
             plt.tight_layout()
             plt.savefig(filename, dpi=150)
@@ -202,9 +204,9 @@ def visualize_data(df, dataset_name):
         correlation = numerical_df.corr()
         mask = np.triu(correlation)
         sns.heatmap(correlation, annot=True, mask=mask, cmap="coolwarm", linewidths=0.5, fmt=".2f")
-        plt.title("Correlation Heatmap")
+        plt.title(f"{dataset_name} - Correlation Heatmap")
         
-        filename = os.path.join(viz_folder, "correlation_heatmap.png")
+        filename = os.path.join(viz_folder, f"{dataset_name}_correlation_heatmap.png")
         plt.tight_layout()
         plt.savefig(filename, dpi=150)
         plt.close()
@@ -215,10 +217,12 @@ def visualize_data(df, dataset_name):
     numerical_cols = df.select_dtypes(include=['int64', 'float64']).columns[:5]  # First 5 numerical
     if len(numerical_cols) > 0:
         sns.boxplot(data=df[numerical_cols])
-        plt.title("Box Plots of Numerical Features")
+        plt.title(f"{dataset_name} - Box Plots of Numerical Features")
         plt.xticks(rotation=45, ha='right')
         
-        filename = os.path.join(viz_folder, "boxplots.png")
+        # Create a descriptive filename
+        numerical_desc = "_".join([col.replace(" ", "").replace("/", "")[:5] for col in numerical_cols[:3]])
+        filename = os.path.join(viz_folder, f"{dataset_name}_boxplots_{numerical_desc}.png")
         plt.tight_layout()
         plt.savefig(filename, dpi=150)
         plt.close()
@@ -234,9 +238,11 @@ def visualize_data(df, dataset_name):
         if len(important_cols) >= 2:  # Need at least 2 columns for a pair plot
             plt.figure(figsize=(10, 8))
             g = sns.pairplot(df[important_cols], height=2.5)
-            g.fig.suptitle("Pair Plot of Key Features", y=1.02)
+            g.fig.suptitle(f"{dataset_name} - Pair Plot of Key Features", y=1.02)
             
-            filename = os.path.join(viz_folder, "pairplot.png")
+            # Create descriptive filename with feature names
+            features_desc = "_".join([col.replace(" ", "").replace("/", "")[:5] for col in important_cols])
+            filename = os.path.join(viz_folder, f"{dataset_name}_pairplot_{features_desc}.png")
             plt.savefig(filename, dpi=150)
             plt.close()
             print(f"✅ Pair plot saved to '{filename}'")
@@ -364,11 +370,12 @@ def train_and_evaluate_models(X_train, X_test, y_train, y_test, preprocessor, da
             sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', 
                        xticklabels=sorted(set(y_test)),
                        yticklabels=sorted(set(y_test)))
-            plt.title(f'Confusion Matrix - {name}')
+            plt.title(f'{dataset_name} - {name} Confusion Matrix')
             plt.xlabel('Predicted Label')
             plt.ylabel('True Label')
             plt.tight_layout()
-            matrix_file = os.path.join(models_folder, f"{name.replace(' ', '_')}_confusion_matrix.png")
+            safe_name = name.replace(' ', '_').replace('/', '_')
+            matrix_file = os.path.join(models_folder, f"{dataset_name}_{safe_name}_confusion_matrix.png")
             plt.savefig(matrix_file, dpi=150)
             plt.close()
         except Exception as e:
@@ -381,7 +388,7 @@ def train_and_evaluate_models(X_train, X_test, y_train, y_test, preprocessor, da
         
         plt.figure(figsize=(12, 8))
         bars = plt.bar(model_names, accuracies, color='skyblue')
-        plt.title(f'Model Accuracy Comparison - {dataset_name}')
+        plt.title(f'{dataset_name} - Model Accuracy Comparison')
         plt.xlabel('Models')
         plt.ylabel('Accuracy (%)')
         plt.xticks(rotation=45, ha='right')
@@ -394,9 +401,9 @@ def train_and_evaluate_models(X_train, X_test, y_train, y_test, preprocessor, da
             
         plt.ylim(0, 105)  # Leave space at the top for text
         plt.tight_layout()
-        plt.savefig(os.path.join(models_folder, "accuracy_comparison.png"), dpi=150)
+        plt.savefig(os.path.join(models_folder, f"{dataset_name}_accuracy_comparison.png"), dpi=150)
         plt.close()
-        print(f"✅ Model accuracy comparison chart saved to '{models_folder}/accuracy_comparison.png'")
+        print(f"✅ Model accuracy comparison chart saved to '{models_folder}/{dataset_name}_accuracy_comparison.png'")
     except Exception as e:
         print(f"⚠️ Could not create accuracy comparison chart: {str(e)}")
     
@@ -485,9 +492,13 @@ def compare_models(all_results):
     print(comparison_display)
     print("\n📌 Best Overall Model: " + comparison.index[0])
     
+    # Get timestamp for unique filenames
+    timestamp = pd.Timestamp.now().strftime('%Y%m%d_%H%M')
+    
     # Save comparison to CSV
-    comparison.to_csv(os.path.join(comparison_folder, "model_comparison.csv"))
-    print(f"✅ Comparison data saved to '{comparison_folder}/model_comparison.csv'")
+    csv_file = os.path.join(comparison_folder, f"model_comparison_{timestamp}.csv")
+    comparison.to_csv(csv_file)
+    print(f"✅ Comparison data saved to '{csv_file}'")
     
     # Create bar chart
     plt.figure(figsize=(14, 10))
@@ -498,7 +509,7 @@ def compare_models(all_results):
     plt.xticks(rotation=45, ha='right')
     plt.legend(loc='lower right')
     plt.tight_layout()
-    comparison_chart = os.path.join(comparison_folder, "model_comparison.png")
+    comparison_chart = os.path.join(comparison_folder, f"all_models_comparison_{timestamp}.png")
     plt.savefig(comparison_chart, dpi=150)
     plt.close()
     
@@ -509,7 +520,7 @@ def compare_models(all_results):
     sns.heatmap(comparison, annot=True, cmap="YlGnBu", fmt=".2f")
     plt.title('Model Performance Comparison Heatmap (%)')
     plt.tight_layout()
-    heatmap_file = os.path.join(comparison_folder, "performance_heatmap.png")
+    heatmap_file = os.path.join(comparison_folder, f"performance_heatmap_{timestamp}.png")
     plt.savefig(heatmap_file, dpi=150)
     plt.close()
     
