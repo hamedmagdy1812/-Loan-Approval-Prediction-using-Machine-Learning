@@ -16,11 +16,13 @@ from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, AdaBoostClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.neural_network import MLPClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+from xgboost import XGBClassifier
 import random
 import warnings
 warnings.filterwarnings('ignore')
@@ -126,47 +128,122 @@ def visualize_data(df, dataset_name):
     """Create visualizations to better understand the dataset"""
     print("\n📊 Let's visualize the data to better understand it!")
     
-    plt.figure(figsize=(18, 12))
+    # Create a folder for this dataset's visualizations
+    viz_folder = f"{dataset_name}_visualizations"
+    os.makedirs(viz_folder, exist_ok=True)
+    print(f"✅ Created folder '{viz_folder}' for visualizations")
     
-    # Target variable distribution
-    plt.subplot(2, 2, 1)
+    # 1. Target variable distribution
+    plt.figure(figsize=(10, 7))
     target_col = df.columns[-1]  # Assuming target is last column
     if df[target_col].dtype == 'object':
-        sns.countplot(x=target_col, data=df)
+        ax = sns.countplot(x=target_col, data=df)
         plt.title(f"Distribution of {target_col}")
+        # Rotate x labels and adjust their position
+        plt.xticks(rotation=45, ha='right')
+        # Adjust bottom margin to make room for labels
+        plt.subplots_adjust(bottom=0.15)
     else:
         sns.histplot(df[target_col], kde=True)
         plt.title(f"Distribution of {target_col}")
     
-    # Numerical features distributions
-    plt.subplot(2, 2, 2)
-    numerical_cols = df.select_dtypes(include=['int64', 'float64']).columns[:3]
-    if len(numerical_cols) > 0:
-        for col in numerical_cols:
-            sns.histplot(df[col], kde=True, label=col)
-        plt.title("Distribution of Key Numerical Features")
-        plt.legend()
+    filename = os.path.join(viz_folder, "target_distribution.png")
+    plt.tight_layout()
+    plt.savefig(filename, dpi=150)
+    plt.close()
+    print(f"✅ Target variable visualization saved to '{filename}'")
     
-    # Correlation heatmap
-    plt.subplot(2, 2, 3)
+    # 2. Distribution of categorical variables
+    categorical_cols = df.select_dtypes(include=['object']).columns
+    
+    # Skip ID columns and columns with too many unique values
+    categorical_cols = [col for col in categorical_cols if not (
+        'id' in col.lower() or  # Skip ID columns
+        'loan_id' in col.lower() or
+        '_id' in col.lower() or 
+        df[col].nunique() > 20  # Skip columns with too many unique values
+    )]
+    
+    if len(categorical_cols) > 0:
+        # Choose a categorical column (prefer 'Sub-Group' if it exists)
+        cat_cols_to_plot = []
+        if 'Sub-Group' in categorical_cols:
+            cat_cols_to_plot.append('Sub-Group')
+        elif 'Group' in categorical_cols:
+            cat_cols_to_plot.append('Group')
+        elif 'Category' in categorical_cols:
+            cat_cols_to_plot.append('Category')
+        else:
+            # Choose up to 3 categorical columns with fewer unique values
+            cat_cols_sorted = sorted([(col, df[col].nunique()) for col in categorical_cols], 
+                                    key=lambda x: x[1])
+            cat_cols_to_plot = [col for col, _ in cat_cols_sorted[:3]]
+        
+        # Plot each selected categorical column
+        for cat_col in cat_cols_to_plot:
+            plt.figure(figsize=(10, 8))
+            ax = sns.countplot(y=cat_col, data=df, 
+                              order=df[cat_col].value_counts().iloc[:20].index)  # Limit to top 20
+            plt.title(f"Distribution of {cat_col}")
+            # Format the plot to avoid overlap
+            ax.tick_params(axis='y', labelsize=9)
+            
+            safe_col_name = cat_col.replace(" ", "_").replace("/", "_")
+            filename = os.path.join(viz_folder, f"{safe_col_name}_distribution.png")
+            plt.tight_layout()
+            plt.savefig(filename, dpi=150)
+            plt.close()
+            print(f"✅ {cat_col} distribution saved to '{filename}'")
+    
+    # 3. Correlation heatmap
+    plt.figure(figsize=(12, 10))
     numerical_df = df.select_dtypes(include=['int64', 'float64'])
-    correlation = numerical_df.corr()
-    mask = np.triu(correlation)
-    sns.heatmap(correlation, annot=True, mask=mask, cmap="coolwarm", linewidths=0.5, fmt=".2f")
-    plt.title("Correlation Heatmap")
+    if not numerical_df.empty:
+        correlation = numerical_df.corr()
+        mask = np.triu(correlation)
+        sns.heatmap(correlation, annot=True, mask=mask, cmap="coolwarm", linewidths=0.5, fmt=".2f")
+        plt.title("Correlation Heatmap")
+        
+        filename = os.path.join(viz_folder, "correlation_heatmap.png")
+        plt.tight_layout()
+        plt.savefig(filename, dpi=150)
+        plt.close()
+        print(f"✅ Correlation heatmap saved to '{filename}'")
     
-    # Box plots
-    plt.subplot(2, 2, 4)
+    # 4. Box plots for numerical features
+    plt.figure(figsize=(12, 8))
+    numerical_cols = df.select_dtypes(include=['int64', 'float64']).columns[:5]  # First 5 numerical
     if len(numerical_cols) > 0:
         sns.boxplot(data=df[numerical_cols])
         plt.title("Box Plots of Numerical Features")
+        plt.xticks(rotation=45, ha='right')
+        
+        filename = os.path.join(viz_folder, "boxplots.png")
+        plt.tight_layout()
+        plt.savefig(filename, dpi=150)
+        plt.close()
+        print(f"✅ Box plots saved to '{filename}'")
     
-    plt.tight_layout()
-    # Save the figure but don't display it
-    filename = f"{dataset_name}_visualizations.png"
-    plt.savefig(filename)
-    plt.close()  # Close the figure to release memory
-    print(f"✅ Visualizations saved to '{filename}'")
+    # 5. Pair plot for selected numerical features (optional for more detailed view)
+    try:
+        # Select a few important numerical columns to avoid overcrowding
+        important_cols = list(numerical_cols[:3])  # First 3 numerical features
+        if target_col not in important_cols and df[target_col].dtype != 'object':
+            important_cols.append(target_col)
+            
+        if len(important_cols) >= 2:  # Need at least 2 columns for a pair plot
+            plt.figure(figsize=(10, 8))
+            g = sns.pairplot(df[important_cols], height=2.5)
+            g.fig.suptitle("Pair Plot of Key Features", y=1.02)
+            
+            filename = os.path.join(viz_folder, "pairplot.png")
+            plt.savefig(filename, dpi=150)
+            plt.close()
+            print(f"✅ Pair plot saved to '{filename}'")
+    except Exception as e:
+        print(f"⚠️ Could not create pair plot: {str(e)}")
+        
+    return viz_folder  # Return the folder name for future reference
 
 # Function to preprocess the dataset
 def preprocess_data(df):
@@ -221,9 +298,14 @@ def preprocess_data(df):
     return X_train, X_test, y_train, y_test, preprocessor
 
 # Function to train and evaluate models
-def train_and_evaluate_models(X_train, X_test, y_train, y_test, preprocessor):
+def train_and_evaluate_models(X_train, X_test, y_train, y_test, preprocessor, dataset_name, viz_folder):
     """Train and evaluate multiple machine learning models"""
     print("\n🤖 Let's train and evaluate our machine learning models!")
+    
+    # Create a subfolder for model performance visualizations
+    models_folder = os.path.join(viz_folder, "model_results")
+    os.makedirs(models_folder, exist_ok=True)
+    print(f"✅ Created folder '{models_folder}' for model performance visualizations")
     
     # Preprocess data
     X_train_processed = preprocessor.fit_transform(X_train)
@@ -238,7 +320,10 @@ def train_and_evaluate_models(X_train, X_test, y_train, y_test, preprocessor):
         "Decision Tree": DecisionTreeClassifier(),
         "Naive Bayes": GaussianNB(),
         "Gradient Boosting": GradientBoostingClassifier(),
-        "Genetic Algorithm": GeneticAlgorithmClassifier(generations=20)
+        "Genetic Algorithm": GeneticAlgorithmClassifier(generations=20),
+        "XGBoost": XGBClassifier(use_label_encoder=False, eval_metric='logloss'),
+        "AdaBoost": AdaBoostClassifier(),
+        "Neural Network": MLPClassifier(max_iter=1000, hidden_layer_sizes=(100,50), early_stopping=True)
     }
     
     # Train and evaluate each model
@@ -272,6 +357,48 @@ def train_and_evaluate_models(X_train, X_test, y_train, y_test, preprocessor):
         print(conf_matrix)
         print("\n📋 Classification Report:")
         print(class_report)
+        
+        # Visualize confusion matrix
+        try:
+            plt.figure(figsize=(8, 6))
+            sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', 
+                       xticklabels=sorted(set(y_test)),
+                       yticklabels=sorted(set(y_test)))
+            plt.title(f'Confusion Matrix - {name}')
+            plt.xlabel('Predicted Label')
+            plt.ylabel('True Label')
+            plt.tight_layout()
+            matrix_file = os.path.join(models_folder, f"{name.replace(' ', '_')}_confusion_matrix.png")
+            plt.savefig(matrix_file, dpi=150)
+            plt.close()
+        except Exception as e:
+            print(f"⚠️ Could not create confusion matrix visualization for {name}: {str(e)}")
+    
+    # Create a bar chart comparing model accuracies
+    try:
+        model_names = list(results.keys())
+        accuracies = [results[model]['accuracy'] * 100 for model in model_names]
+        
+        plt.figure(figsize=(12, 8))
+        bars = plt.bar(model_names, accuracies, color='skyblue')
+        plt.title(f'Model Accuracy Comparison - {dataset_name}')
+        plt.xlabel('Models')
+        plt.ylabel('Accuracy (%)')
+        plt.xticks(rotation=45, ha='right')
+        
+        # Add accuracy values on top of bars
+        for i, bar in enumerate(bars):
+            plt.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 1, 
+                   f"{accuracies[i]:.2f}%", ha='center', va='bottom',
+                   fontsize=9, rotation=0)
+            
+        plt.ylim(0, 105)  # Leave space at the top for text
+        plt.tight_layout()
+        plt.savefig(os.path.join(models_folder, "accuracy_comparison.png"), dpi=150)
+        plt.close()
+        print(f"✅ Model accuracy comparison chart saved to '{models_folder}/accuracy_comparison.png'")
+    except Exception as e:
+        print(f"⚠️ Could not create accuracy comparison chart: {str(e)}")
     
     return results
 
@@ -303,9 +430,11 @@ def process_dataset(file_path, dataset_name):
     
     # Step 2: Visualize the data
     try:
-        visualize_data(df, dataset_name)
+        viz_folder = visualize_data(df, dataset_name)
     except Exception as e:
         print(f"⚠️ Warning: Could not create visualizations: {str(e)}")
+        viz_folder = f"{dataset_name}_visualizations"
+        os.makedirs(viz_folder, exist_ok=True)
     
     # Step 3: Preprocess the data
     try:
@@ -316,7 +445,7 @@ def process_dataset(file_path, dataset_name):
     
     # Step 4: Train and evaluate models
     try:
-        results = train_and_evaluate_models(X_train, X_test, y_train, y_test, preprocessor)
+        results = train_and_evaluate_models(X_train, X_test, y_train, y_test, preprocessor, dataset_name, viz_folder)
         return results
     except Exception as e:
         print(f"❌ Error during model training/evaluation: {str(e)}")
@@ -328,6 +457,10 @@ def compare_models(all_results):
     print(f"\n{'='*80}")
     print("📊 MODEL PERFORMANCE COMPARISON 📊".center(80))
     print(f"{'='*80}\n")
+    
+    # Create a folder for comparison results
+    comparison_folder = "comparison_results"
+    os.makedirs(comparison_folder, exist_ok=True)
     
     # Create comparison DataFrame
     comparison = pd.DataFrame()
@@ -352,18 +485,37 @@ def compare_models(all_results):
     print(comparison_display)
     print("\n📌 Best Overall Model: " + comparison.index[0])
     
+    # Save comparison to CSV
+    comparison.to_csv(os.path.join(comparison_folder, "model_comparison.csv"))
+    print(f"✅ Comparison data saved to '{comparison_folder}/model_comparison.csv'")
+    
     # Create bar chart
-    plt.figure(figsize=(12, 8))
+    plt.figure(figsize=(14, 10))
     comparison.plot(kind='bar')
     plt.title('Model Performance Comparison Across Datasets (%)')
     plt.xlabel('Model')
     plt.ylabel('Accuracy (%)')
-    plt.xticks(rotation=45)
+    plt.xticks(rotation=45, ha='right')
+    plt.legend(loc='lower right')
     plt.tight_layout()
-    plt.savefig('model_comparison.png')
-    plt.close()  # Close the figure
+    comparison_chart = os.path.join(comparison_folder, "model_comparison.png")
+    plt.savefig(comparison_chart, dpi=150)
+    plt.close()
     
-    print("✅ Comparison chart saved to 'model_comparison.png'")
+    print(f"✅ Comparison chart saved to '{comparison_chart}'")
+    
+    # Create a heatmap for easier visualization
+    plt.figure(figsize=(12, 10))
+    sns.heatmap(comparison, annot=True, cmap="YlGnBu", fmt=".2f")
+    plt.title('Model Performance Comparison Heatmap (%)')
+    plt.tight_layout()
+    heatmap_file = os.path.join(comparison_folder, "performance_heatmap.png")
+    plt.savefig(heatmap_file, dpi=150)
+    plt.close()
+    
+    print(f"✅ Performance heatmap saved to '{heatmap_file}'")
+    
+    return comparison
 
 # Main execution flow
 if __name__ == "__main__":
