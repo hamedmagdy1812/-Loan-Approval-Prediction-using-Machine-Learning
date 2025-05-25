@@ -1,8 +1,3 @@
-#!/usr/bin/env python3
-# Loan Approval Prediction using Machine Learning
-# A beginner-friendly educational project
-
-# Let's import all the libraries we'll need
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -40,7 +35,7 @@ plt.ioff()  # Turn off interactive mode to prevent script from waiting for plot 
 # Simple Genetic Algorithm Classifier
 class GeneticAlgorithmClassifier:
     """A simple genetic algorithm for classification problems"""
-    def __init__(self, pop_size=100, generations=50, mutation_rate=0.1):
+    def __init__(self, pop_size=100, generations=20, mutation_rate=0.1):
         self.pop_size = pop_size
         self.generations = generations 
         self.mutation_rate = mutation_rate
@@ -49,65 +44,48 @@ class GeneticAlgorithmClassifier:
         
     def _fitness(self, solution, X, y):
         """Calculate fitness using weighted features and simple threshold"""
-        predictions = (X * solution).sum(axis=1) > 0.5
-        return accuracy_score(y, predictions)
-    
-    def _create_population(self, n_features):
-        """Create initial population with random weights"""
-        return [np.random.uniform(-1, 1, n_features) for _ in range(self.pop_size)]
-    
-    def _select_parents(self, population, fitness_scores):
-        """Tournament selection for parents"""
-        parents = []
-        for _ in range(len(population)):
-            idx1, idx2 = random.sample(range(len(population)), 2)
-            if fitness_scores[idx1] > fitness_scores[idx2]:
-                parents.append(population[idx1])
-            else:
-                parents.append(population[idx2])
-        return parents
-    
-    def _crossover(self, parents):
-        """Create new generation through crossover"""
-        children = []
-        for i in range(0, len(parents), 2):
-            if i+1 < len(parents):
-                crossover_point = random.randint(1, len(parents[i])-1)
-                child1 = np.concatenate([parents[i][:crossover_point], parents[i+1][crossover_point:]])
-                child2 = np.concatenate([parents[i+1][:crossover_point], parents[i][crossover_point:]])
-                children.extend([child1, child2])
-        return children
-    
-    def _mutate(self, population):
-        """Apply random mutations to population"""
-        for i in range(len(population)):
-            for j in range(len(population[i])):
-                if random.random() < self.mutation_rate:
-                    population[i][j] += random.uniform(-0.5, 0.5)
-        return population
+        return accuracy_score(y, (X * solution).sum(axis=1) > 0.5)
     
     def fit(self, X, y):
         """Train the genetic algorithm classifier"""
         X = np.array(X)
         n_features = X.shape[1]
-        population = self._create_population(n_features)
+        population = [np.random.uniform(-1, 1, n_features) for _ in range(self.pop_size)]
         
         for _ in range(self.generations):
-            fitness_scores = [self._fitness(solution, X, y) for solution in population]
-            best_idx = np.argmax(fitness_scores)
-            self.best_solution = population[best_idx]
+            # Calculate fitness and select best solution
+            fitness_scores = [self._fitness(sol, X, y) for sol in population]
+            self.best_solution = population[np.argmax(fitness_scores)]
             
-            parents = self._select_parents(population, fitness_scores)
-            children = self._crossover(parents)
-            population = self._mutate(children)
+            # Tournament selection
+            parents = []
+            for _ in range(len(population)):
+                idx1, idx2 = random.sample(range(len(population)), 2)
+                parents.append(population[idx1] if fitness_scores[idx1] > fitness_scores[idx2] else population[idx2])
+            
+            # Crossover
+            children = []
+            for i in range(0, len(parents), 2):
+                if i+1 < len(parents):
+                    crossover_point = random.randint(1, len(parents[i])-1)
+                    child1 = np.concatenate([parents[i][:crossover_point], parents[i+1][crossover_point:]])
+                    child2 = np.concatenate([parents[i+1][:crossover_point], parents[i][crossover_point:]])
+                    children.extend([child1, child2])
+            
+            # Mutation
+            for i in range(len(children)):
+                for j in range(len(children[i])):
+                    if random.random() < self.mutation_rate:
+                        children[i][j] += random.uniform(-0.5, 0.5)
+            
+            population = children
         
         self.feature_weights = self.best_solution
         return self
     
     def predict(self, X):
         """Make predictions with trained model"""
-        X = np.array(X)
-        return (X * self.feature_weights).sum(axis=1) > 0.5
+        return (np.array(X) * self.feature_weights).sum(axis=1) > 0.5
 
 # Function to load dataset from different file formats
 def load_dataset(file_path):
@@ -131,12 +109,11 @@ def load_dataset(file_path):
 # Function to visualize the dataset
 def visualize_data(df, dataset_name):
     """Create visualizations to better understand the dataset"""
-    print("\n📊 Let's visualize the data to better understand it!")
-    
-    # Create a folder for this dataset's visualizations
+    print("\n📊 Creating visualizations...")
     viz_folder = f"{dataset_name}_visualizations"
     os.makedirs(viz_folder, exist_ok=True)
-    print(f"✅ Created folder '{viz_folder}' for visualizations")
+    models_folder = os.path.join(viz_folder, "model_results")
+    os.makedirs(models_folder, exist_ok=True)
     
     # 1. Target variable distribution
     plt.figure(figsize=(10, 7))
@@ -219,7 +196,7 @@ def visualize_data(df, dataset_name):
             correlation = numerical_df.corr()
             
             # If the correlation matrix is too large, only show top correlated features
-            if correlation.shape[0] > 20:
+            if correlation.shape[0] > 15:
                 print(f"⚠️ Correlation matrix is large ({correlation.shape[0]}x{correlation.shape[0]}). Showing only top correlations.")
                 # Get the mean absolute correlation for each feature
                 mean_abs_corr = correlation.abs().mean()
@@ -468,8 +445,8 @@ def process_dataset(file_path, dataset_name):
         return None
         
     # Check if dataset has enough records
-    if len(df) < 1500:
-        print(f"⚠️ Warning: This dataset has only {len(df)} records, which is less than the recommended 1500 records.")
+    if len(df) < 1000:
+        print(f"⚠️ Warning: This dataset has only {len(df)} records, which is less than the recommended 1000 records.")
         proceed = input("Do you want to continue with this dataset anyway? (y/n): ")
         if proceed.lower() != 'y':
             return None
@@ -498,7 +475,7 @@ def process_dataset(file_path, dataset_name):
         results = train_and_evaluate_models(X_train, X_test, y_train, y_test, preprocessor, dataset_name, viz_folder)
         return results
     except Exception as e:
-        print(f"❌ Error during model training/evaluation: {str(e)}")
+        print(f"❌ Error during model training: {str(e)}")
         return None
 
 # Function to compare model performances across datasets
@@ -607,10 +584,10 @@ if __name__ == "__main__":
     
     # Define paths to your local datasets - update these with your actual file paths
     dataset_paths = {
-        "Original Loan Dataset": "/Users/Hamed/Documents/selected topics/-Loan-Approval-Prediction-using-Machine-Learning-1/Datasets/loan_approval_data.csv",
-        "Financial Balance Sheet": "/Users/Hamed/Documents/selected topics/-Loan-Approval-Prediction-using-Machine-Learning-1/Datasets/Balance Sheet .xlsx",
-        "German Credit Risk": "/Users/Hamed/Documents/selected topics/-Loan-Approval-Prediction-using-Machine-Learning-1/Datasets/german_credit_data.csv",
-        "Loan Approval Dataset 2": "/Users/Hamed/Documents/selected topics/-Loan-Approval-Prediction-using-Machine-Learning-1/Datasets/loan_approval_dataset_2.csv"
+        "Original Loan Dataset": "/Users/Hamed/Documents/selected topics/-Loan-Approval-Prediction-using-Machine-Learning/Datasets/loan_approval_data.csv",
+        "Financial Balance Sheet": "/Users/Hamed/Documents/selected topics/-Loan-Approval-Prediction-using-Machine-Learning/Datasets/Balance Sheet .xlsx",
+        "German Credit Risk": "/Users/Hamed/Documents/selected topics/-Loan-Approval-Prediction-using-Machine-Learning/Datasets/german_credit_data.csv",
+        "Loan Approval Dataset 2": "/Users/Hamed/Documents/selected topics/-Loan-Approval-Prediction-using-Machine-Learning/Datasets/loan_approval_dataset_2.csv"
     }
     
     # Process each dataset and collect results
@@ -636,4 +613,4 @@ if __name__ == "__main__":
     else:
         print("\n❌ No datasets were successfully processed. Please check your file paths and formats.")
     
-    print("\n🎉 That's all, folks! Thanks for exploring loan approval prediction with us! 🎉") 
+    print("\n🎉 That's all, Thanks for exploring loan approval prediction with us! 🎉") 
